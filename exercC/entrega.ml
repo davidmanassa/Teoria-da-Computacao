@@ -595,6 +595,7 @@ let regexp st =
   Esta é a estrutura de um State. Serve para representar o autómato.
 *)
 type state = {
+  id : int;
   isEnd : bool;
   mutable transitions : (string * state) list;
   mutable epsilonTransitions : state list
@@ -617,8 +618,10 @@ let rec printStateList lst i =
 (*
   Construtor para o State
 *)
+let counter = ref 0
 let createState isFinal =
-  {isEnd = isFinal; transitions = []; epsilonTransitions = []}
+  counter := !counter + 1;
+  {id = !counter; isEnd = isFinal; transitions = []; epsilonTransitions = []}
 
 (*
   Conjunto de funções onde criamos o autómato
@@ -684,9 +687,18 @@ let getLetter (a, _) = a
       then getAllEpsilonStates b return@(getAllEpsilonStates a.epsilonTransitions [])
       else getAllEpsilonStates b (return@[a]@(getAllEpsilonStates a.epsilonTransitions []))
 *)
+let rec containsState lst st =
+  match lst with
+    | a::b -> if st.id = a.id
+      then true
+      else containsState b st
+    | [] -> false
+
 let rec getAllEpsilonStates epsilonTransitionList return =
   match epsilonTransitionList with
-    | a::b -> getAllEpsilonStates b (return@[a]@(getAllEpsilonStates a.epsilonTransitions []))
+    | a::b -> if containsState return a
+      then getAllEpsilonStates b return@(getAllEpsilonStates a.epsilonTransitions [])
+      else getAllEpsilonStates b (return@[a]@(getAllEpsilonStates a.epsilonTransitions []))
     | [] -> return
 
 (*
