@@ -6,6 +6,20 @@ open Array
 
 (* Definição dos tipos de dados para os autómatos e para as expressões regulares *)
 (* TODO!!!! type .... type automato = .... *)
+type transition = {
+  from : int;
+  letter : char;
+  destination : int
+}
+type automato = {
+  n_states : int;
+  initial_state : int;
+  n_final_states : int;
+  final_states : int list;
+  n_transitions : int;
+  transitions : transition list
+}
+
     
 type regexp =
  | V  
@@ -27,8 +41,20 @@ let rec string_of_regexp s =
 
 (* definições das funções de leitura *)
 (* ... TODO!!! ... *)
+let read_int_list () =
+  let line = read_line () in
+    let ints = Str.split (Str.regexp "  *") line in
+      List.map int_of_string ints
+let rec read_transitions ret i n =
+  if i = n then ret
+  else
+    (let line = read_line () in
+      let data = Str.split (Str.regexp "  *") line in
+        (read_transitions (ret@[{from = int_of_string (List.nth data 0); letter = (List.nth data 1).[0]; destination = int_of_string (List.nth data 2)}]) (i+1) n))
 (* leitura dos dados de input *)
-let leitura () = (* TODO *) assert false
+let leitura () = (* TODO *)
+  let max, is, nfs, fs, ntrans = read_int (), read_int (), read_int (), read_int_list (), read_int () in
+    max, {n_states = max; initial_state = is; n_final_states = nfs; final_states = fs; n_transitions = ntrans; transitions = (read_transitions [] 0 ntrans)}
 
 
 (* "max" = número de estados do autómato "maq" *)

@@ -612,29 +612,34 @@ let createState isFinal =
 
 let initialState = createState false
 
-let stateNum = ref 0
-let rec printList lst sn =
-  match lst with
-    | [] -> ()
-    | (a, b)::c -> (Printf.printf "S%d - %s" sn a; print_string " -> Sn\n";
-    printList c sn; printAutomaton b)
-and printAutomaton currentState =
-  (stateNum := !stateNum + 1;
-  printList currentState.transitions !stateNum)
 
 let getLetter (a, _) = a
-let rec printTransLst lst i =
+let getSt (_, a) = a
+let rec printTransLst from lst =
   match lst with
-    | a::b -> Printf.printf "\n S%d -%s> Sk " i (getLetter a); printTransLst b i
+    | a::b -> Printf.printf "\n s%d -%s> s%d " from.id (getLetter a) (getSt a).id; printTransLst from b
     | [] -> ()
-let rec printEpsilonTransLst lst i =
+let rec printEpsilonTransLst from lst =
   match lst with
-    | a::b -> Printf.printf "\n S%d -Ep> Sk " i; printEpsilonTransLst b i
+    | a::b -> Printf.printf "\n s%d -Ep> s%d " from.id a.id; printEpsilonTransLst from b
     | [] -> ()
-let rec printStateList lst i = 
+let rec printStateList lst = 
   match lst with
-    | a::b -> printTransLst a.transitions i; printEpsilonTransLst a.epsilonTransitions i; printStateList b (i+1)
+    | a::b -> printTransLst a a.transitions; printEpsilonTransLst a a.epsilonTransitions; printStateList b
     | [] -> ()
+
+let rec printAutomaton ist =
+  printTrans ist ist.transitions;
+  printEpTrans ist ist.epsilonTransitions
+and printTrans fromSt lst =
+  match lst with
+    | a::b -> (Printf.printf "\n s%d -%s> s%d " fromSt.id (getLetter a) (getSt a).id; printTrans fromSt b; printAutomaton (getSt a))
+    | [] -> ()
+and printEpTrans fromSt lst =
+  match lst with
+    | a::b -> (Printf.printf "\n s%d -EP> s%d " fromSt.id a.id; printEpTrans fromSt b; printAutomaton a)
+    | [] -> ()
+
 
 let rec createAutomaton regex currentState finalState =
   match regex with

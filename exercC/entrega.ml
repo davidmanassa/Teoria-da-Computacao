@@ -601,20 +601,6 @@ type state = {
   mutable epsilonTransitions : state list
 }
 
-let getLetter (a, _) = a
-let rec printTransLst lst i =
-  match lst with
-    | a::b -> Printf.printf "\n S%d -%s> Sk " i (getLetter a); printTransLst b i
-    | [] -> ()
-let rec printEpsilonTransLst lst i =
-  match lst with
-    | a::b -> Printf.printf "\n S%d -Ep> Sk " i; printEpsilonTransLst b i
-    | [] -> ()
-let rec printStateList lst i = 
-  match lst with
-    | a::b -> printTransLst a.transitions i; printEpsilonTransLst a.epsilonTransitions i; printStateList b (i+1)
-    | [] -> ()
-
 (*
   Construtor para o State
 *)
@@ -667,25 +653,23 @@ and zeroOrMore s currentState finalState =
       createAutomaton s q1 q2
     )
 
+
 (*
   Funções auxiliares para tratar um tupulo
 *)
-let checkLetter (a, _) letter = 
-  if a = String.make 1 letter then true else false
 let getState (_, a) = a
 let getLetter (a, _) = a
+let checkLetter (a, _) letter = 
+  if a = String.make 1 letter then true else false
 
 (*
-  Função que precorre listas de epsilonTransitions
-  -> Devolve lista com novos states
+  Listas auxiliares para a pesquisa
+*)
+let added = ref []
+let addedEp = ref []
 
-  if List.mem a return
-      then getAllEpsilonStates b return
-      else getAllEpsilonStates b (return@[a]@(getAllEpsilonStates a.epsilonTransitions []))
-
-      if List.mem a return
-      then getAllEpsilonStates b return@(getAllEpsilonStates a.epsilonTransitions [])
-      else getAllEpsilonStates b (return@[a]@(getAllEpsilonStates a.epsilonTransitions []))
+(*
+  Método auxiliar que verifica sem um estado está dentro de uma lista
 *)
 let rec containsState lst st =
   match lst with
@@ -694,23 +678,31 @@ let rec containsState lst st =
       else containsState b st
     | [] -> false
 
+
+(*
+  Função que percorre listas de epsilonTransitions
+  -> Devolve lista com novos estados
+*)
 let rec getAllEpsilonStates epsilonTransitionList return =
   match epsilonTransitionList with
-    | a::b -> if containsState return a
+    | a::b -> if containsState !addedEp a
       then getAllEpsilonStates b return@(getAllEpsilonStates a.epsilonTransitions [])
-      else getAllEpsilonStates b (return@[a]@(getAllEpsilonStates a.epsilonTransitions []))
+      else (addedEp := !addedEp@[a]; getAllEpsilonStates b (return@[a]@(getAllEpsilonStates a.epsilonTransitions [])))
     | [] -> return
 
 (*
-  Função que precorre uma lista de transitions
-  -> Devolve lista com novos states
+  Função que percorre uma lista de transitions
+  -> Devolve lista com novos estados
 *)
 let rec getTransitions lst checkForChar return =
   match lst with
-    | a::b -> if checkLetter a checkForChar
-      then getTransitions b checkForChar return@[(getState a)]
-      else getTransitions b checkForChar return
+    | a::b -> if containsState !added (getState a)
+      then getTransitions b checkForChar return
+      else (if checkLetter a checkForChar
+        then (added := !added@[(getState a)]; getTransitions b checkForChar (return@[(getState a)]))
+        else getTransitions b checkForChar return)
     | [] -> return
+
 
 (*
   Verifica se existe um estado final entre os estados que está a analisar
@@ -734,9 +726,6 @@ let initialState = createState false
 *)
 let atualStates = ref [initialState]
 
-let initialStateAndEpsilon () =
-  [initialState]@(getAllEpsilonStates [initialState] [])
-
 (*
   Função que precorre a lista de estados atuais
   -> Devolve uma nova lista de estados para analisar na próxima letra da string
@@ -745,37 +734,12 @@ let rec checkAtualStates currentList atualChar return =
   match currentList with 
     | a::b -> let newStates = getTransitions (a.transitions) atualChar [] in
       checkAtualStates b atualChar (return@newStates)
-    | [] -> return@(getAllEpsilonStates return return)@(initialStateAndEpsilon ())
+    | [] -> return
 
-(*
-let tempVisited = ref []
-let getSt (a, _) = a 
-let getCounter (_, a) = a
-let rec printAutomaton st concat =
-  if st.isEnd
-  then Printf.printf "%d" (concat^"\n")
-  else (
-    printTrans st.transitions concat;
-    printEpTrans st.epsilonTransitions concat
-  )
-and printTrans lst currentConcat =
-  match lst with
-    | a::b -> if List.mem (getState a) !tempVisited
-      then (if getCounter a > 2
-        then printTrans b currentConcat
-        else (tempVisited := !tempVisited@[((getState a), )]; printAutomaton (getState a) (currentConcat^" -"^(getLetter a)^"> "); printTrans b currentConcat)
-        )
-      else (tempVisited := !tempVisited@[(getState a)]; printAutomaton (getState a) (currentConcat^" -"^(getLetter a)^"> "); printTrans b currentConcat)
-    | [] -> ()
-and printEpTrans lst currentConcat =
-  match lst with
-    | a::b -> if List.mem a !tempVisited
-      then printEpTrans b currentConcat
-      else (tempVisited := !tempVisited@[a]; printAutomaton a (currentConcat^" -Ep> "); printEpTrans b currentConcat)
-    | [] -> ()*)
 
 (*
   Função que verifica se a string dada está contida no autómato do programa
+  Adiciona também à lista de estados a analisar a lista de estado alcançáveis através da transições Epsilon
   
   Substitui a lista existente de estados a analisar
 
@@ -784,13 +748,15 @@ and printEpTrans lst currentConcat =
 let rec check word pos =
     if pos = String.length word
     then "NO"
-    else
-      let newAtualStates = checkAtualStates (!atualStates@(getAllEpsilonStates !atualStates [])) (String.get word pos) [] in
-      let () = (Printf.printf "\n\n pos %d: " pos; printStateList newAtualStates 0) in
-        (atualStates := newAtualStates;
-        if checkForFinal !atualStates
-        then "YES"
-        else check word (pos+1))
+    else (added := []; addedEp := [];
+      let prevEpStates = getAllEpsilonStates !atualStates [] in (* Adiciona estados alcançáveis através de transições Epsilon *)
+        let initEpStates = getAllEpsilonStates [initialState] [] in (* Adicona estado inicial e estados alcançáveis através de transições Epsilon apartir do estado inicial *)
+          let newStLst1 = checkAtualStates (!atualStates@prevEpStates@initEpStates) (word.[pos]) [] in (* Procura por novos estádos alcançáveis através da letra a analisar *)
+            let newStLst2 = (newStLst1@prevEpStates@initEpStates) in (* Concatenação dos resultados *)
+              (atualStates := newStLst2;
+              if checkForFinal !atualStates
+              then "YES"
+              else check word (pos+1)))
 
 (*
   Inputs e chamada às funções
