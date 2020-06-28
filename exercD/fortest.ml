@@ -1,10 +1,4 @@
 (** Algoritmo de MacNaughton - Yamada para calcular uma expressão regular a partir de um autómato **)
-
-(*
-  Para a resolução deste exercício, baseámo-nos unicamente no enunciado e esqueleto do exercício.
-  O método de resolução foi pensado por nós com base no enunciado.
-*)
-
 open List
 open Scanf
 open Array
@@ -12,7 +6,6 @@ open Array
 
 (* Definição dos tipos de dados para os autómatos e para as expressões regulares *)
 (* TODO!!!! type .... type automato = .... *)
-(* Tipo de dados transition e automato *)
 type transition = {
   from : int;
   letter : char;
@@ -48,7 +41,6 @@ let rec string_of_regexp s =
 
 (* definições das funções de leitura *)
 (* ... TODO!!! ... *)
-(* Funções de leitura  *)
 let read_int_list () =
   let line = read_line () in
     let ints = Str.split (Str.regexp "  *") line in
@@ -115,7 +107,6 @@ let rec simplify (a:regexp) =
  |  _ -> a
  
 (* TODO!!!  - calcular a expressão regular - funções em falta aqui*)
-(* Função de pesquisa, usada para quando k = 1 *)
 let rec search transList i j ret =
   match transList with
     | a::b -> if a.from = i && a.destination = j
@@ -129,14 +120,14 @@ let rec search transList i j ret =
           else search b i j (U ( C a.letter , ret))
         )
       else search b i j ret
-    | [] -> ret
+    | [] -> (Printf.printf "\n R(%d, %d, %d) = %s " i j 1 (ret |> string_of_regexp); ret)
 
-(* Formula para quando k != 1 *)
 let r i j k =
-  let regex = (U ((mat.(i).(j).(k-1)), P ( mat.(i).(k-1).(k-1), P ( S (mat.(k-1).(k-1).(k-1)), mat.(k-1).(j).(k-1))))) in
-  regex
 
-(* Calculo dos dados para todas as posições da matrix *)
+  let regex = (U ((mat.(i).(j).(k-1)), P ( mat.(i).(k-1).(k-1), P ( S (mat.(k-1).(k-1).(k-1)), mat.(k-1).(j).(k-1))))) in
+  (Printf.printf "\n R(%d, %d, %d) = %s " i j k (regex  |> string_of_regexp);
+  regex)
+
 let rec calculate k =
   if (k <= max+1)
   then (
@@ -151,7 +142,6 @@ let rec calculate k =
     )
   else ()
 
-(* Fórmula do resultado *)
 let get_result () =
   (calculate 1;
   if maq.n_final_states = 1
@@ -161,10 +151,12 @@ let get_result () =
       if !ret = V
       then (ret := mat.(maq.initial_state).((List.nth maq.final_states (i-1))).(max+1))
       else (ret := U (mat.(maq.initial_state).((List.nth maq.final_states (i-1))).(max+1), !ret))
-    done; !ret))
+    done; (Printf.printf "\n\n Final:  %s \n\n" (string_of_regexp !ret)); !ret))
 
 (*calculo efecivo da expressão regular resultante, a partir das funções cuja definição se espera  *)
 let result = get_result () (*TODO!!!!! (substituir "V" pelo código em falta *)
+
+  
 
 (* vizualização do resultado, simplificado *)
 let () = result |> simplify |> string_of_regexp |> print_endline
