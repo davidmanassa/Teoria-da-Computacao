@@ -581,6 +581,16 @@ let regexp st =
 (* **************************************************************************************************************** *)
 (* ********************************************   Começar aqui **************************************************** *)
 
+(* exemplo de código para ilustrar o uso da função regexp e o tipo regexp *)
+let rec string_of_regexp s =
+  match s with
+  | V       -> "0"
+  | E       -> "1"
+  | C  c    -> String.make 1 c    
+  | U (f,g) -> "("^(string_of_regexp f)^" + "^(string_of_regexp g)^")"
+  | P (f,g) -> "("^(string_of_regexp f)^" . "^(string_of_regexp g)^")"
+  | S s     -> (string_of_regexp s)^"*"
+
 (*
   Exercicio resolvido com base nos links dados no enunciado e site do Professor, nomeadamente o seguinte link:
   https://deniskyashif.com/2019/02/17/implementing-a-regular-expression-engine/
@@ -621,6 +631,7 @@ let rec createAutomaton regex currentState finalState =
     | U (f,g) -> union f g currentState finalState
     | P (f,g) -> product f g currentState finalState
     | S s     -> zeroOrMore s currentState finalState
+
 and union f g currentState finalState =
   let q1 = createState false in
     let q11 = createState false in
@@ -635,10 +646,12 @@ and union f g currentState finalState =
             q2.transitions <- q2.transitions@[((createAutomaton g q2 q22), q22)];
             q22.epsilonTransitions <- q22.epsilonTransitions@[finalState]; "?"
           )
+
 and product f g currentState finalState =
   let newState = createState false in
     (currentState.transitions <- currentState.transitions@[((createAutomaton f currentState newState), newState)];
     newState.transitions <- newState.transitions@[((createAutomaton g newState finalState), finalState)]; "?")
+
 and zeroOrMore s currentState finalState =
   let q1 = createState false in
     let q2 = createState false in
@@ -696,7 +709,8 @@ let rec getTransitions lst checkForChar return =
     | a::b -> 
       if (getLetter a).[0] = "?".[0]
       then getTransitions b checkForChar return
-      else (if containsState !added (getState a)
+      else ( Printf.printf " LETRA : %c   " (getLetter a).[0];
+        if containsState !added (getState a)
         then getTransitions b checkForChar return
         else (if checkLetter a checkForChar
           then (added := !added@[(getState a)]; getTransitions b checkForChar (return@[(getState a)]))
@@ -721,6 +735,20 @@ let rec checkForFinal atualLst =
 *)
 let initialState = createState false
 
+let invalidChecked = ref []
+let rec removeInvalids ist =
+  if (List.mem ist !invalidChecked)
+  then ()
+  else (
+    invalidChecked := !invalidChecked@[ist];
+    ist.transitions <- invalidTrans ist.transitions [])
+and invalidTrans lst ret =
+  match lst with
+    | a::b -> if (getLetter a).[0] = "?".[0]
+      then (removeInvalids (getState a); invalidTrans b ret)
+      else (removeInvalids (getState a); invalidTrans b (ret@[a]))
+    | [] -> ret
+
 (*
   Lista de estado atuais
   Estados atuais são os estados que está a analisar no momento
@@ -738,6 +766,44 @@ let rec checkAtualStates currentList atualChar return =
     | [] -> return
 
 
+
+let getLetter (a, _) = a
+let getSt (_, a) = a
+let rec printTransLst from lst =
+  match lst with
+    | a::b -> Printf.printf "\n s%d -%s> s%d %B " from.id (getLetter a) (getSt a).id (getSt a).isEnd; printTransLst from b
+    | [] -> ()
+let rec printEpsilonTransLst from lst =
+  match lst with
+    | a::b -> Printf.printf "\n s%d -Ep> s%d  %B " from.id a.id a.isEnd; printEpsilonTransLst from b
+    | [] -> ()
+let rec printStateList lst = 
+  match lst with
+    | a::b -> printTransLst a a.transitions; printEpsilonTransLst a a.epsilonTransitions; printStateList b
+    | [] -> ()
+
+let rec printAtualStates lst =
+  match lst with
+    | a::b -> (Printf.printf " S%d " a.id; printAtualStates b)
+    | [] -> ()
+
+let printed = ref []
+let rec printAutomaton ist =
+  if (List.mem ist !printed)
+  then ()
+  else (
+  printed := !printed@[ist]; printTrans ist ist.transitions;
+  printEpTrans ist ist.epsilonTransitions)
+and printTrans fromSt lst =
+  match lst with
+    | a::b -> (Printf.printf "\n s%d -%s> s%d %B " fromSt.id (getLetter a) (getSt a).id (getSt a).isEnd; printTrans fromSt b; printAutomaton (getSt a))
+    | [] -> ()
+and printEpTrans fromSt lst =
+  match lst with
+    | a::b -> (Printf.printf "\n s%d -EP> s%d %B " fromSt.id a.id a.isEnd; printEpTrans fromSt b; printAutomaton a)
+    | [] -> ()
+
+
 (*
   Função que verifica se a string dada está contida no autómato do programa
   Adiciona também à lista de estados a analisar a lista de estado alcançáveis através da transições Epsilon
@@ -746,7 +812,18 @@ let rec checkAtualStates currentList atualChar return =
 
   Dá nos o resultado final do programa
 *)
+
+let rec remove =
+  function
+    | []       -> []
+    | x::[]    -> x::[]
+    | x::y::tl ->
+       if x=y then remove (y::tl)
+       else x::remove (y::tl)
+
 let rec check word pos =
+  let () = Printf.printf " \n\n\n\n\n "; printAtualStates !atualStates in
+  let () = (Printf.printf "\npos %d (%c): " pos word.[pos]; printStateList (!atualStates)) in
     if pos = String.length word
     then "NO"
     else (added := []; addedEp := [];
@@ -755,7 +832,7 @@ let rec check word pos =
           let newStLst1 = checkAtualStates (!atualStates@prevEpStates@initEpStates) (word.[pos]) [] in (* Procura por novos estádos alcançáveis através da letra a analisar *)
             let newStLst2 = (initEpStates@newStLst1) in (* Concatenação dos resultados *)
               (atualStates := newStLst2;
-              if checkForFinal (!atualStates@(getAllEpsilonStates !atualStates []))
+              if checkForFinal !atualStates
               then "YES"
               else check word (pos+1)))
 
@@ -765,7 +842,11 @@ let rec check word pos =
 let () =
   let input = read_line () in
     let r = regexp input in
+    let () = print_string "input: " in
+      let () = print_endline (string_of_regexp r) in
       let _ = createAutomaton r initialState (createState true) in
+      let _ = removeInvalids initialState in 
+      let () = printAutomaton initialState in 
         let word = read_line () in
           let output = check word 0 in
             print_endline output

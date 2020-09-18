@@ -8,7 +8,6 @@ type regexp =
  
 module Parser_regexp = struct
 
-  
 module MenhirBasics = struct
   
   exception Error
@@ -640,7 +639,47 @@ and printEpTrans fromSt lst =
     | a::b -> (Printf.printf "\n s%d -EP> s%d " fromSt.id a.id; printEpTrans fromSt b; printAutomaton a)
     | [] -> ()
 
+    let rec createAutomaton regex currentState finalState =
+      match regex with
+        | V       -> "0"
+        | E       -> "1"
+        | C  c    -> String.make 1 c    
+        | U (f,g) -> union f g currentState finalState
+        | P (f,g) -> product f g currentState finalState
+        | S s     -> zeroOrMore s currentState finalState
+    
+    and union f g currentState finalState =
+      let q1 = createState false in
+        let q11 = createState false in
+          let q2 = createState false in
+            let q22 = createState false in
+              (
+                currentState.epsilonTransitions <- currentState.epsilonTransitions@[q1];
+                q1.transitions <- q1.transitions@[((createAutomaton f q1 q11), q11)];
+                q11.epsilonTransitions <- q11.epsilonTransitions@[finalState];
+    
+                currentState.epsilonTransitions <- currentState.epsilonTransitions@[q2];
+                q2.transitions <- q2.transitions@[((createAutomaton g q2 q22), q22)];
+                q22.epsilonTransitions <- q22.epsilonTransitions@[finalState]; "(1?"^(string_of_regexp f)^":"^(string_of_regexp g)^")"
+              )
+    
+    and product f g currentState finalState =
+      let newState = createState false in
+        (currentState.transitions <- currentState.transitions@[((createAutomaton f currentState newState), newState)];
+        newState.transitions <- newState.transitions@[((createAutomaton g newState finalState), finalState)]; "(2?"^(string_of_regexp f)^":"^(string_of_regexp g)^")")
+    
+    and zeroOrMore s currentState finalState =
+      let q1 = createState false in
+        let q2 = createState false in
+        (
+          currentState.epsilonTransitions <- currentState.epsilonTransitions@[q1];
+          currentState.epsilonTransitions <- currentState.epsilonTransitions@[finalState];
+          q2.epsilonTransitions <- q2.epsilonTransitions@[finalState];
+          q2.epsilonTransitions <- q2.epsilonTransitions@[q1];
+          q1.transitions <- q1.transitions@[((createAutomaton s q1 q2), q2)]; "(3?"^(string_of_regexp s)^")"
+        )
 
+        
 let rec createAutomaton regex currentState finalState =
   match regex with
     | V       -> "0"
