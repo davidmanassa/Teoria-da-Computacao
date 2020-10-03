@@ -1,4 +1,4 @@
-Teoria Da Computação
+# Teoria Da Computação
 
 
-Exercicios de avaliação realizados ao longo do semestre
+Exercicios de avaliação realizados no ano 2019/2020
